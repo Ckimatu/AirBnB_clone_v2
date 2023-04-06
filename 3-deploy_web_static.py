@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """
-Creates and distributes an archive to your web servers, using the function deploy
+Creates and distributes an archive to your web servers,
+using the function deploy
 """
 import os.path
 from datetime import datetime
