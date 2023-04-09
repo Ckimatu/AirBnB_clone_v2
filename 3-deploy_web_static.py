@@ -1,90 +1,68 @@
 #!/usr/bin/python3
-"""
-Fabric script that  creates and distributes
-an archive to my web servers
+"""creates and distributes an archive to your web servers
 """
 
-from fabric.api import env, put, run
-from os.path import exists
 import os
 from datetime import datetime
-
-env.hosts = ['54.152.134.92', '54.172.230.218']
-env.user = 'ubuntu'
-env.key_filename = '~/.ssh/school'
+from fabric.api import env, local, put, run, runs_once
 
 
+env.hosts = ['54.162.0.15', '54.237.104.124']
+
+
+@runs_once
 def do_pack():
-    """ Function to compress a file """
-
-    current_time = datetime.now().strftime("%Y%m%d%H%M%S")
-    arch_path = "versions/web_static_{}.tgz".format(current_time)
-
+    """Archives static files."""
+    if not os.path.isdir("versions"):
+        os.mkdir("versions")
+    cur_time = datetime.now()
+    output = "versions/web_static_{}{}{}{}{}{}.tgz".format(
+        cur_time.year,
+        cur_time.month,
+        cur_time.day,
+        cur_time.hour,
+        cur_time.minute,
+        cur_time.second
+    )
     try:
-        """creating a directory called versions"""
-        local("mkdir -p versions")
-
-        """creating an archive for webstatic"""
-        local("tar -cvzf {} web_static/".format(arch_path))
-
-        local("tar -cvzf {} web_static/".format(arch_path))
-
-        """returning the path to the archive file created"""
-        return "{}".format(arch_path)
-
-        """return exception errors"""
-    except Exception as e:
-        return None
+        print("Packing web_static to {}".format(output))
+        local("tar -cvzf {} web_static".format(output))
+        archize_size = os.stat(output).st_size
+        print("web_static packed: {} -> {} Bytes".format(output, archize_size))
+    except Exception:
+        output = None
+    return output
 
 
 def do_deploy(archive_path):
+    """Deploys the static files to the host servers.
+    Args:
+        archive_path (str): The path to the archived static files.
     """
-    Deploys an archive to the web servers
-    """
-    """ Check for archive_path """
-    if not exists(archive_path):
+    if not os.path.exists(archive_path):
         return False
-
-    """ file names with and without extension """
-    arch_name = os.path.basename(archive_path)
-    arch_name_minus = os.path.splitext(arch_name)[0]
-
+    file_name = os.path.basename(archive_path)
+    folder_name = file_name.replace(".tgz", "")
+    folder_path = "/data/web_static/releases/{}/".format(folder_name)
+    success = False
     try:
-        """ Saving archive to tmp on the web servers """
-        put(archive_path, "/tmp/")
-
-        """ Creating directory for the deployed files"""
-        run("sudo mkdir -p /data/web_static/releases/{}/"
-            .format(arch_name_minus))
-
-        """ Decompressing the archive into the we_static folder """
-        run("sudo tar -xzf /tmp/{} -C /data/web_static/releases/{}/"
-            .format(arch_name, arch_name_minus))
-
-        """ Deleting the archive from the server """
-        run("sudo rm /tmp/{}".format(arch_name))
-
-        """ Moving files to new folder and deleting the old symbolic link """
-        run("sudo mv /data/web_static/releases/{}/web_static/* \
-            /data/web_static/releases/{}/"
-            .format(arch_name_minus, arch_name_minus))
-        run("sudo rm -rf /data/web_static/releases/{}/web_static"
-            .format(arch_name_minus))
-
-        """ Deleting the old symbolic link and create a new one """
-        run("sudo rm -rf /data/web_static/current")
-        run("sudo ln -s /data/web_static/releases/{}/ \
-                /data/web_static/current".format(arch_name_minus))
-
-        return True
-
-    except Exception as e:
-        return False
+        put(archive_path, "/tmp/{}".format(file_name))
+        run("mkdir -p {}".format(folder_path))
+        run("tar -xzf /tmp/{} -C {}".format(file_name, folder_path))
+        run("rm -rf /tmp/{}".format(file_name))
+        run("mv {}web_static/* {}".format(folder_path, folder_path))
+        run("rm -rf {}web_static".format(folder_path))
+        run("rm -rf /data/web_static/current")
+        run("ln -s {} /data/web_static/current".format(folder_path))
+        print('New version is now LIVE!')
+        success = True
+    except Exception:
+        success = False
+    return success
 
 
 def deploy():
-    """Create and deploy an archive to a web server."""
-    arch_path = do_pack()
-    if arch_path is None:
-        return False
-    return do_deploy(arch_path)
+    """Archives and deploys static files to the host servers.
+    """
+    archive_path = do_pack()
+    return do_deploy(archive_path) if archive_path else False
