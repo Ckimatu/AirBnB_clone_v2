@@ -1,39 +1,58 @@
 #!/usr/bin/python3
 """
-Distributes  an archive to your web servers, using the function do_deploy
+Fabric script that distributes an archive to
+my web servers
 """
-import os
+
 from fabric.api import env, put, run
+from os.path import exists
+import os
 
 env.hosts = ['54.152.134.92', '54.172.230.218']
+env.user = 'ubuntu'
+env.key_filename = '~/.ssh/school'
 
 
 def do_deploy(archive_path):
     """
-    Deploys the static files to the host servers.
-    Args:
-        archive_path (str): The path of the archive to distribute.
-    Returns:
-        True if all operations have been done correctly,
-        otherwise returns False.
+    Deploys an archive to the web servers
     """
-    if not os.path.exists(archive_path):
+    """ Checking for archive_path """
+    if not exists(archive_path):
         return False
-    file_name = os.path.basename(archive_path)
-    folder_name = file_name.replace(".tgz", "")
-    folder_path = "/data/web_static/releases/{}/".format(folder_name)
-    success = False
+
+    """ File names with and without extension """
+    arch_name = os.path.basename(archive_path)
+    arch_name_minus = os.path.splitext(arch_name)[0]
+
     try:
-        put(archive_path, "/tmp/{}".format(file_name))
-        run("mkdir -p {}".format(folder_path))
-        run("tar -xzf /tmp/{} -C {}".format(file_name, folder_path))
-        run("rm -rf /tmp/{}".format(file_name))
-        run("mv {}web_static/* {}".format(folder_path, folder_path))
-        run("rm -rf {}web_static".format(folder_path))
-        run("rm -rf /data/web_static/current")
-        run("ln -s {} /data/web_static/current".format(folder_path))
-        print('New version deployed!')
-        success = True
-    except Exception:
-        success = False
-    return success
+        """ Saving archive to tmp on the web servers """
+        put(archive_path, "/tmp/")
+
+        """ Creating a directory for the deployed files"""
+        run("sudo mkdir -p /data/web_static/releases/{}/"
+            .format(arch_name_minus))
+
+        """ Decompressing the archive into the we_static folder """
+        run("sudo tar -xzf /tmp/{} -C /data/web_static/releases/{}/"
+            .format(arch_name, arch_name_minus))
+
+        """ Deleting the archive from the server """
+        run("sudo rm /tmp/{}".format(arch_name))
+
+        """ Moving files to new folder and deleting the old symbolic link """
+        run("sudo mv /data/web_static/releases/{}/web_static/* \
+            /data/web_static/releases/{}/"
+            .format(arch_name_minus, arch_name_minus))
+        run("sudo rm -rf /data/web_static/releases/{}/web_static"
+            .format(arch_name_minus))
+
+        """ Deleting the old symbolic link and creating a new one """
+        run("sudo rm -rf /data/web_static/current")
+        run("sudo ln -s /data/web_static/releases/{}/ \
+                /data/web_static/current".format(arch_name_minus))
+
+        return True
+
+    except Exception as e:
+        return False
