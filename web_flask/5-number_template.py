@@ -33,6 +33,7 @@ def python(text):
     text = text.replace('_', ' ')
     return "Python {}".format(text)
 
+
 @app.route('/number/<int:n>', strict_slashes=False)
 def number(n):
     """if value is integer, it returns string that dispalys
@@ -46,7 +47,7 @@ def number_template(n):
     if isinstance(n, int):
         return render_template('/5-number.html', n=n)
     else:
-        return abort (404)
+        return abort(404)
 
 
 if __name__ == '__main__':

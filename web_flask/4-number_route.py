@@ -33,6 +33,7 @@ def python(text):
     text = text.replace('_', ' ')
     return "Python {}".format(text)
 
+
 @app.route('/number/<int:n>', strict_slashes=False)
 def number(n):
     """if value is integer, it returns string that dispalys
